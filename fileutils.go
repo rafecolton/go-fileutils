@@ -33,6 +33,13 @@ func ChownR(path string, uid, gid int) error {
 
 // Cp is like `cp`
 func Cp(src, dest string) (err error) {
+
+	// get info on src
+	si, err := os.Lstat(src)
+	if err != nil || !si.Mode().IsRegular() {
+		return
+	}
+
 	//open source
 	in, err := os.Open(src)
 	if err != nil {
@@ -54,12 +61,6 @@ func Cp(src, dest string) (err error) {
 
 	//copy to dest from source
 	if _, err = io.Copy(out, in); err != nil {
-		return
-	}
-
-	//duplicate source permissions on dest
-	si, err := os.Stat(src)
-	if err != nil {
 		return
 	}
 
