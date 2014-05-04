@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -134,4 +135,9 @@ func Rm(name string) error {
 // RmRF is `rm -rf` / os.RemoveAll
 func RmRF(path string) error {
 	return os.RemoveAll(path)
+}
+
+// Which is `which` / exec.LookPath
+func Which(file string) (string, error) {
+	return exec.LookPath(file)
 }
