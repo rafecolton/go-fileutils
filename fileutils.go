@@ -33,11 +33,96 @@ func ChownR(path string, uid, gid int) error {
 
 // Cp is like `cp`
 func Cp(src, dest string) (err error) {
+	return cpFollowLinks(src, dest)
+}
+
+func cpSymlink(src, dest string, sourceInfo os.FileInfo) (err error) {
+	var linkTarget string
+	linkTarget, err = os.Readlink(src)
+	if err != nil {
+		return
+	}
+
+	if err = os.Symlink(linkTarget, dest); err != nil {
+		return
+	}
+
+	//preserve file permissions on copying
+	if err = os.Chmod(dest, sourceInfo.Mode()); err != nil {
+		return
+	}
+	return nil
+}
+
+func cpFollowLinks(src, dest string) (err error) {
 
 	// get info on src
 	si, err := os.Lstat(src)
-	if err != nil || !si.Mode().IsRegular() {
+	if err != nil {
 		return
+	}
+
+	destMode := si.Mode()
+
+	if !si.Mode().IsRegular() {
+		linkTarget, err := os.Readlink(src)
+		if err != nil {
+			return err
+		}
+
+		linkTargetInfo, err := os.Stat(linkTarget)
+		if err != nil {
+			return err
+		}
+
+		destMode = linkTargetInfo.Mode()
+	}
+
+	//open source
+	in, err := os.Open(src)
+	if err != nil {
+		return
+	}
+	defer in.Close()
+
+	//create dest
+	out, err := os.Create(dest)
+	if err != nil {
+		return
+	}
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	//copy to dest from source
+	if _, err = io.Copy(out, in); err != nil {
+		return
+	}
+
+	//preserve file permissions on copying
+	if err = out.Chmod(destMode); err != nil {
+		return
+	}
+
+	//sync dest to disk
+	err = out.Sync()
+
+	return
+}
+
+func cpPreserveLinks(src, dest string) (err error) {
+	// get info on src
+	si, err := os.Lstat(src)
+	if err != nil {
+		return
+	}
+
+	// handle symlinks
+	if !si.Mode().IsRegular() {
+		return cpSymlink(src, dest, si)
 	}
 
 	//open source
@@ -109,7 +194,7 @@ func CpR(source, dest string) (err error) {
 				return
 			}
 		} else {
-			if err = Cp(sourceFilePath, destFilePath); err != nil {
+			if err = cpPreserveLinks(sourceFilePath, destFilePath); err != nil {
 				return
 			}
 		}
