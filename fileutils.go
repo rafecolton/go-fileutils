@@ -36,7 +36,7 @@ func Cp(src, dest string) (err error) {
 	return cpFollowLinks(src, dest)
 }
 
-func cpSymlink(src, dest string, sourceInfo os.FileInfo) (err error) {
+func cpSymlink(src, dest string) (err error) {
 	var linkTarget string
 	linkTarget, err = os.Readlink(src)
 	if err != nil {
@@ -48,7 +48,19 @@ func cpSymlink(src, dest string, sourceInfo os.FileInfo) (err error) {
 	}
 
 	//preserve file permissions on copying
-	if err = os.Chmod(dest, sourceInfo.Mode()); err != nil {
+	return cpSymlinkPermissions(linkTarget, dest)
+
+}
+
+func cpSymlinkPermissions(linkTarget, dest string) (err error) {
+	linkTargetInfo, err := os.Stat(linkTarget)
+	if err != nil {
+		return err
+	}
+
+	destMode := linkTargetInfo.Mode()
+
+	if err = os.Chmod(dest, destMode); err != nil {
 		return
 	}
 	return nil
@@ -64,18 +76,13 @@ func cpFollowLinks(src, dest string) (err error) {
 
 	destMode := si.Mode()
 
+	var linkTarget string
+
 	if !si.Mode().IsRegular() {
-		linkTarget, err := os.Readlink(src)
+		linkTarget, err = os.Readlink(src)
 		if err != nil {
 			return err
 		}
-
-		linkTargetInfo, err := os.Stat(linkTarget)
-		if err != nil {
-			return err
-		}
-
-		destMode = linkTargetInfo.Mode()
 	}
 
 	//open source
@@ -102,9 +109,16 @@ func cpFollowLinks(src, dest string) (err error) {
 		return
 	}
 
-	//preserve file permissions on copying
-	if err = out.Chmod(destMode); err != nil {
-		return
+	if linkTarget == "" {
+		if err = out.Chmod(destMode); err != nil {
+			return
+		}
+
+	} else {
+		if err = cpSymlinkPermissions(linkTarget, dest); err != nil {
+			return
+		}
+
 	}
 
 	//sync dest to disk
@@ -122,7 +136,7 @@ func cpPreserveLinks(src, dest string) (err error) {
 
 	// handle symlinks
 	if !si.Mode().IsRegular() {
-		return cpSymlink(src, dest, si)
+		return cpSymlink(src, dest)
 	}
 
 	//open source
