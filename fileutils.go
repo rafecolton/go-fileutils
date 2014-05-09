@@ -43,49 +43,17 @@ func cpSymlink(src, dest string) (err error) {
 		return
 	}
 
-	if err = os.Symlink(linkTarget, dest); err != nil {
-		return
-	}
-
-	//preserve file permissions on copying
-	return cpSymlinkPermissions(linkTarget, dest)
-
-}
-
-func cpSymlinkPermissions(linkTarget, dest string) (err error) {
-	linkTargetInfo, err := os.Stat(linkTarget)
-	if err != nil {
-		return err
-	}
-
-	destMode := linkTargetInfo.Mode()
-
-	if err = os.Chmod(dest, destMode); err != nil {
-		return
-	}
-	return nil
+	return os.Symlink(linkTarget, dest)
 }
 
 func cpFollowLinks(src, dest string) (err error) {
-
 	// get info on src
 	si, err := os.Lstat(src)
 	if err != nil {
 		return
 	}
 
-	destMode := si.Mode()
-
-	var linkTarget string
-
-	if !si.Mode().IsRegular() {
-		linkTarget, err = os.Readlink(src)
-		if err != nil {
-			return err
-		}
-	}
-
-	//open source
+	//open src
 	in, err := os.Open(src)
 	if err != nil {
 		return
@@ -109,16 +77,8 @@ func cpFollowLinks(src, dest string) (err error) {
 		return
 	}
 
-	if linkTarget == "" {
-		if err = out.Chmod(destMode); err != nil {
-			return
-		}
-
-	} else {
-		if err = cpSymlinkPermissions(linkTarget, dest); err != nil {
-			return
-		}
-
+	if err = out.Chmod(si.Mode()); err != nil {
+		return
 	}
 
 	//sync dest to disk
