@@ -33,11 +33,70 @@ func ChownR(path string, uid, gid int) error {
 
 // Cp is like `cp`
 func Cp(src, dest string) (err error) {
+	return cpFollowLinks(src, dest)
+}
 
+func cpSymlink(src, dest string) (err error) {
+	var linkTarget string
+	linkTarget, err = os.Readlink(src)
+	if err != nil {
+		return
+	}
+
+	return os.Symlink(linkTarget, dest)
+}
+
+func cpFollowLinks(src, dest string) (err error) {
 	// get info on src
 	si, err := os.Lstat(src)
-	if err != nil || !si.Mode().IsRegular() {
+	if err != nil {
 		return
+	}
+
+	//open src
+	in, err := os.Open(src)
+	if err != nil {
+		return
+	}
+	defer in.Close()
+
+	//create dest
+	out, err := os.Create(dest)
+	if err != nil {
+		return
+	}
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
+	//copy to dest from source
+	if _, err = io.Copy(out, in); err != nil {
+		return
+	}
+
+	if err = out.Chmod(si.Mode()); err != nil {
+		return
+	}
+
+	//sync dest to disk
+	err = out.Sync()
+
+	return
+}
+
+func cpPreserveLinks(src, dest string) (err error) {
+	// get info on src
+	si, err := os.Lstat(src)
+	if err != nil {
+		return
+	}
+
+	// handle symlinks
+	if !si.Mode().IsRegular() {
+		return cpSymlink(src, dest)
 	}
 
 	//open source
@@ -109,7 +168,7 @@ func CpR(source, dest string) (err error) {
 				return
 			}
 		} else {
-			if err = Cp(sourceFilePath, destFilePath); err != nil {
+			if err = cpPreserveLinks(sourceFilePath, destFilePath); err != nil {
 				return
 			}
 		}
