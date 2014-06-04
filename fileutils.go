@@ -11,6 +11,11 @@ import (
 	"path/filepath"
 )
 
+var DevNull = ioutil.Discard
+var Stdout = os.Stdout
+var Stderr = os.Stderr
+var Stdin = os.Stdin
+
 // ChmodR is like `chmod -R`
 func ChmodR(name string, mode os.FileMode) error {
 	return filepath.Walk(name, func(path string, info os.FileInfo, err error) error {
