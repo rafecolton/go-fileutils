@@ -6,10 +6,6 @@ TARGETS := $(F)
 
 GINKGO_PATH ?= "."
 
-export GINKGO_PATH
-
-default: test
-
 .PHONY: all
 all: clean build test
 
@@ -20,12 +16,8 @@ clean:
 .PHONY: test
 test: fmtpolice
 
-.PHONY: deps
-deps:
-	go get github.com/golang/lint/golint
-
 .PHONY: fmtpolice
-fmtpolice: deps fmt lint
+fmtpolice: fmt lint
 
 .PHONY: fmt
 fmt:
