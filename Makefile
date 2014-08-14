@@ -1,8 +1,7 @@
 SHELL := /bin/bash
 SUDO ?= sudo
 DOCKER ?= docker
-F := github.com/modcloth/go-fileutils
-TARGETS := $(F)
+TARGETS := github.com/modcloth/go-fileutils
 
 GOPATH := $(shell echo $${GOPATH%%:*})
 GINKGO_PATH ?= "."
