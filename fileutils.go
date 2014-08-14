@@ -65,7 +65,7 @@ func cpPreserveLinks(src, dest string) (err error) {
 CpR is like `cp -R`
 */
 func CpR(source, dest string) (err error) {
-	return CpWithArgs(source, dest, CpArgs{Recursive: true})
+	return CpWithArgs(source, dest, CpArgs{Recursive: true, PreserveLinks: true})
 }
 
 /*
