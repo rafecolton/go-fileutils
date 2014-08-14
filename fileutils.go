@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 )
 
-// List of arguments which can be passed to the CpWithArgs method
+// CpArgs is a list of arguments which can be passed to the CpWithArgs method
 type CpArgs struct {
 	Recursive          bool
 	PreserveLinks      bool
@@ -68,6 +68,10 @@ func CpR(source, dest string) (err error) {
 	return CpWithArgs(source, dest, CpArgs{Recursive: true})
 }
 
+/*
+CpWithArgs is a version of the Cp method that allows the passing of an
+arguments struct to further modify the copying behavior
+*/
 func CpWithArgs(source, dest string, args CpArgs) (err error) {
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
