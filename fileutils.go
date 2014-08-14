@@ -11,6 +11,13 @@ import (
 	"path/filepath"
 )
 
+// List of arguments which can be passed to the CpWithArgs method
+type CpArgs struct {
+	Recursive          bool
+	PreserveLinks      bool
+	PreserveTimestamps bool
+}
+
 // ChmodR is like `chmod -R`
 func ChmodR(name string, mode os.FileMode) error {
 	return filepath.Walk(name, func(path string, info os.FileInfo, err error) error {
@@ -33,7 +40,7 @@ func ChownR(path string, uid, gid int) error {
 
 // Cp is like `cp`
 func Cp(src, dest string) (err error) {
-	return cpFollowLinks(src, dest)
+	return CpWithArgs(src, dest, CpArgs{})
 }
 
 func cpSymlink(src, dest string) (err error) {
@@ -47,133 +54,104 @@ func cpSymlink(src, dest string) (err error) {
 }
 
 func cpFollowLinks(src, dest string) (err error) {
-	// get info on src
-	si, err := os.Lstat(src)
-	if err != nil {
-		return
-	}
-
-	//open src
-	in, err := os.Open(src)
-	if err != nil {
-		return
-	}
-	defer in.Close()
-
-	//create dest
-	out, err := os.Create(dest)
-	if err != nil {
-		return
-	}
-	defer func() {
-		cerr := out.Close()
-		if err == nil {
-			err = cerr
-		}
-	}()
-
-	//copy to dest from source
-	if _, err = io.Copy(out, in); err != nil {
-		return
-	}
-
-	if err = out.Chmod(si.Mode()); err != nil {
-		return
-	}
-
-	//sync dest to disk
-	err = out.Sync()
-
-	return
+	return CpWithArgs(src, dest, CpArgs{})
 }
 
 func cpPreserveLinks(src, dest string) (err error) {
-	// get info on src
-	si, err := os.Lstat(src)
-	if err != nil {
-		return
-	}
-
-	// handle symlinks
-	if !si.Mode().IsRegular() {
-		return cpSymlink(src, dest)
-	}
-
-	//open source
-	in, err := os.Open(src)
-	if err != nil {
-		return
-	}
-	defer in.Close()
-
-	//create dest
-	out, err := os.Create(dest)
-	if err != nil {
-		return
-	}
-	defer func() {
-		cerr := out.Close()
-		if err == nil {
-			err = cerr
-		}
-	}()
-
-	//copy to dest from source
-	if _, err = io.Copy(out, in); err != nil {
-		return
-	}
-
-	if err = out.Chmod(si.Mode()); err != nil {
-		return
-	}
-
-	//sync dest to disk
-	err = out.Sync()
-
-	return
+	return CpWithArgs(src, dest, CpArgs{PreserveLinks: true})
 }
 
 /*
 CpR is like `cp -R`
 */
 func CpR(source, dest string) (err error) {
-	// get properties of source dir
+	return CpWithArgs(source, dest, CpArgs{Recursive: true})
+}
+
+func CpWithArgs(source, dest string, args CpArgs) (err error) {
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		return
 	}
 
-	if !sourceInfo.IsDir() {
-		return errors.New("source is not a directory")
-	}
+	if sourceInfo.IsDir() {
+		// Handle the dir case
+		if !args.Recursive {
+			return errors.New("source is a directory")
+		}
 
-	// ensure dest dir does not already exist
-	if _, err = os.Open(dest); !os.IsNotExist(err) {
-		return errors.New("destination already exists")
-	}
+		// ensure dest dir does not already exist
+		if _, err = os.Open(dest); !os.IsNotExist(err) {
+			return errors.New("destination already exists")
+		}
 
-	// create dest dir
-	if err = os.MkdirAll(dest, sourceInfo.Mode()); err != nil {
-		return
-	}
+		// create dest dir
+		if err = os.MkdirAll(dest, sourceInfo.Mode()); err != nil {
+			return
+		}
 
-	files, err := ioutil.ReadDir(source)
+		files, err := ioutil.ReadDir(source)
+		if err != nil {
+			return err
+		}
 
-	for _, file := range files {
-		sourceFilePath := fmt.Sprintf("%s/%s", source, file.Name())
-		destFilePath := fmt.Sprintf("%s/%s", dest, file.Name())
+		for _, file := range files {
+			sourceFilePath := fmt.Sprintf("%s/%s", source, file.Name())
+			destFilePath := fmt.Sprintf("%s/%s", dest, file.Name())
 
-		if file.IsDir() {
-			if err = CpR(sourceFilePath, destFilePath); err != nil {
-				return
+			if err = CpWithArgs(sourceFilePath, destFilePath, args); err != nil {
+				return err
 			}
-		} else {
-			if err = cpPreserveLinks(sourceFilePath, destFilePath); err != nil {
-				return
+		}
+	} else {
+		// Handle the file case
+		si, err := os.Lstat(source)
+		if err != nil {
+			return err
+		}
+
+		if args.PreserveLinks && !si.Mode().IsRegular() {
+			return cpSymlink(source, dest)
+		}
+
+		//open source
+		in, err := os.Open(source)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+
+		//create dest
+		out, err := os.Create(dest)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			cerr := out.Close()
+			if err == nil {
+				err = cerr
+			}
+		}()
+
+		//copy to dest from source
+		if _, err = io.Copy(out, in); err != nil {
+			return err
+		}
+
+		if err = out.Chmod(si.Mode()); err != nil {
+			return err
+		}
+
+		if args.PreserveTimestamps {
+			if err = os.Chtimes(dest, si.ModTime(), si.ModTime()); err != nil {
+				return err
 			}
 		}
 
+		//sync dest to disk
+		err = out.Sync()
 	}
+
 	return
 }
 
