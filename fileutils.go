@@ -13,9 +13,9 @@ import (
 
 // CpArgs is a list of arguments which can be passed to the CpWithArgs method
 type CpArgs struct {
-	Recursive          bool
-	PreserveLinks      bool
-	PreserveTimestamps bool
+	Recursive       bool
+	PreserveLinks   bool
+	PreserveModTime bool
 }
 
 // ChmodR is like `chmod -R`
@@ -146,7 +146,7 @@ func CpWithArgs(source, dest string, args CpArgs) (err error) {
 			return err
 		}
 
-		if args.PreserveTimestamps {
+		if args.PreserveModTime {
 			if err = os.Chtimes(dest, si.ModTime(), si.ModTime()); err != nil {
 				return err
 			}
