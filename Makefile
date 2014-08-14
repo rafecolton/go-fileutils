@@ -4,7 +4,10 @@ DOCKER ?= docker
 F := github.com/modcloth/go-fileutils
 TARGETS := $(F)
 
+GOPATH := $(shell echo $${GOPATH%%:*})
 GINKGO_PATH ?= "."
+
+export GOPATH
 
 .PHONY: all
 all: clean build test
